@@ -525,3 +525,36 @@ command:
   tdb.py check "gpu_usage_over_threshold_duration_{{ driver }} > 23000"
   # If HW decode fails, video engine activity will not meet the threshold for
   # long enough so no check needed
+
+unit: template
+template-resource: graphics_card
+template-filter: graphics_card.driver in ['i915']
+template-engine: jinja2
+template-unit: job
+id: kivu/stress_chromium_h264_decoding_{{ driver }}
+category_id: kivu
+flags: simple
+user: root
+_summary: Play twenty H264 videos in Chromium to check maxed out hw accel
+depends:
+  kivu-common/prepare-test-data
+requires:
+  snap.name == "chromium"
+  executable.name == "intel_gpu_top"
+environ:
+  # necessary for local mode
+  XDG_SESSION_TYPE
+  XDG_RUNTIME_DIR
+  NORMAL_USER
+command:
+  PLAY_TIMEOUT=30
+  echo "{\"gpu_usage_over_threshold_duration_{{ driver }}\": $(gpu-thresh.py --threshold=99 --video_engine=VideoEnhance --timeout=${PLAY_TIMEOUT} --gpu={{ driver }})}" | tdb.py insert --session-id=check_chromium_h264_decoding &
+  # Play looping video in Chromium
+  echo XDG_SESSION_TYPE "${XDG_SESSION_TYPE}"
+  for i in {1..20}; do
+  sudo --preserve-env -u "${NORMAL_USER}" bash -c "timeout ${PLAY_TIMEOUT} chromium --new-window --window-size=800,600\
+                                                                                    file:///home/"${NORMAL_USER}"/checkbox-test-data/h264-video.html &"
+  done
+  sleep ${PLAY_TIMEOUT}
+  tdb.py wait
+  tdb.py check "gpu_usage_over_threshold_duration_{{ driver }} > 20000"
