@@ -551,8 +551,15 @@ environ:
   XDG_RUNTIME_DIR
   NORMAL_USER
 command:
+  intel_gen=$(cpuid_tmp.py --intel_gen_number)
+  if [[ $intel_gen -ge 12 ]]
+  then
+      video_engine=VideoEnhance
+  else
+      video_engine=Video
+  fi 
   PLAY_TIMEOUT=30
-  echo "{\"gpu_usage_over_threshold_duration_{{ driver }}\": $(gpu-thresh.py --threshold=99 --video_engine=VideoEnhance --timeout=${PLAY_TIMEOUT} --gpu={{ driver }})}" | tdb.py insert --session-id=check_chromium_h264_decoding &
+  echo "{\"gpu_usage_over_threshold_duration_{{ driver }}\": $(gpu-thresh.py --threshold=99 --video_engine=${video_engine} --timeout=${PLAY_TIMEOUT} --gpu={{ driver }})}" | tdb.py insert --session-id=check_chromium_h264_decoding &
   # Play looping video in Chromium
   echo XDG_SESSION_TYPE "${XDG_SESSION_TYPE}"
   for i in {1..20}; do
