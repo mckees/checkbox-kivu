@@ -551,6 +551,8 @@ environ:
   XDG_RUNTIME_DIR
   NORMAL_USER
 command:
+  set -x
+  tdb.py reset
   intel_gen=$(cpuid_tmp.py --intel_gen_number)
   if [[ $intel_gen -ge 12 ]]
   then
@@ -558,14 +560,23 @@ command:
   else
       video_engine=Video
   fi 
-  PLAY_TIMEOUT=30
-  echo "{\"gpu_usage_over_threshold_duration_{{ driver }}\": $(gpu-thresh.py --threshold=99 --video_engine=${video_engine} --timeout=${PLAY_TIMEOUT} --gpu={{ driver }})}" | tdb.py insert --session-id=check_chromium_h264_decoding &
+  PLAY_TIMEOUT=40
+  VIDEO_ENGINE_THRESH=99
+  echo "{\"gpu_usage_over_threshold_duration_{{ driver }}\": $(gpu-thresh.py --threshold=${VIDEO_ENGINE_THRESH} --video_engine=${video_engine} --timeout=${PLAY_TIMEOUT} --gpu={{ driver }})}" | tdb.py insert --session-id=check_chromium_h264_decoding &
   # Play looping video in Chromium
   echo XDG_SESSION_TYPE "${XDG_SESSION_TYPE}"
-  for i in {1..20}; do
+  instant_gpu_load=$(gpu-load-instant.py)
+  echo $instant_gpu_load
+  while [[ $instant_gpu_load -lt $VIDEO_ENGINE_THRESH ]]; do
+  for i in {1..10}; do
   sudo --preserve-env -u "${NORMAL_USER}" bash -c "timeout ${PLAY_TIMEOUT} chromium --new-window --window-size=800,600\
                                                                                     file:///home/"${NORMAL_USER}"/checkbox-test-data/h264-video.html &"
-  done
+  done # end for loop
+  sleep 5
+  # if the load isn't high enough to stress, go back to the top of the loop
+  instant_gpu_load=$(gpu-load-instant.py)
+  echo $instant_gpu_load
+  done # end while loop
   sleep ${PLAY_TIMEOUT}
   tdb.py wait
   tdb.py check "gpu_usage_over_threshold_duration_{{ driver }} > 20000"

@@ -75,6 +75,9 @@ if __name__ == "__main__":
     if gpu_driver == 'i915':
         time_above_threshold = load_intel(fname=fname, timeout=timeout)
 
+    with f as open('/tmp/time_above_threshold.txt', 'w'):
+        f.write(time_above_threshold)
+
     # Divide that time by the number of active video engines
     time_above_threshold = time_above_threshold/get_num_active_engines(fname=fname)
 
